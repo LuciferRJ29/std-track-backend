@@ -1,19 +1,27 @@
 import asyncio
+import logging
 import math
 import random
 import time
 from typing import List, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import httpx
+
+from scrapers.flight_scraper import scrape_flights
+from scrapers.ship_scraper import scrape_ships
+from scrapers.rail_engine import calculate_train_positions
+from scrapers.transit_engine import calculate_transit_positions
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("std_track")
 
 app = FastAPI(
     title="STD Track Telemetry Engine",
-    description="Real-time multi-modal transport streaming server (Airplanes, Trains, Ships, Buses, Cars)",
-    version="1.0.0"
+    description="Real-time multi-modal transport streaming server (FlightRadar24 + OpenSky + AIS Ships + Indian Railways)",
+    version="2.0.0"
 )
 
-# CORS configuration for Vercel and local development
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,188 +30,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initial Telemetry Dataset
-INITIAL_FLEET: List[Dict[str, Any]] = [
-    # ✈️ Airplanes
-    {
-        "id": "AI-161",
-        "callsign": "AIC161",
-        "category": "flight",
-        "operator": "Air India Express",
-        "origin": {"code": "DEL", "city": "New Delhi", "lat": 28.5562, "lon": 77.1000},
-        "dest": {"code": "LHR", "city": "London Heathrow", "lat": 51.4700, "lon": -0.4543},
-        "lat": 29.8,
-        "lon": 74.2,
-        "speed": 840,
-        "altitude": 36000,
-        "heading": 295,
-        "status": "Cruising - On Time",
-        "eta": "21:30 UTC",
-        "fuel": 88,
-        "squawk": "4712",
-        "transponder": "Mode-S ADS-B",
-        "source": "OpenSky Network Stream"
-    },
-    {
-        "id": "6E-204",
-        "callsign": "IGO204",
-        "category": "flight",
-        "operator": "IndiGo Airlines",
-        "origin": {"code": "BOM", "city": "Mumbai", "lat": 19.0896, "lon": 72.8656},
-        "dest": {"code": "DEL", "city": "New Delhi", "lat": 28.5562, "lon": 77.1000},
-        "lat": 23.4,
-        "lon": 74.9,
-        "speed": 780,
-        "altitude": 32000,
-        "heading": 32,
-        "status": "En Route",
-        "eta": "15:45 UTC",
-        "fuel": 76,
-        "squawk": "1254",
-        "transponder": "Mode-S ADS-B",
-        "source": "ADS-B Exchange"
-    },
-    {
-        "id": "EK-501",
-        "callsign": "UAE501",
-        "category": "flight",
-        "operator": "Emirates A380",
-        "origin": {"code": "DXB", "city": "Dubai", "lat": 25.2532, "lon": 55.3657},
-        "dest": {"code": "BOM", "city": "Mumbai", "lat": 19.0896, "lon": 72.8656},
-        "lat": 21.8,
-        "lon": 67.5,
-        "speed": 910,
-        "altitude": 39000,
-        "heading": 115,
-        "status": "Descending",
-        "eta": "16:10 UTC",
-        "fuel": 64,
-        "squawk": "3310",
-        "transponder": "Mode-S ADS-B",
-        "source": "OpenSky Network"
-    },
-    # 🚆 Trains
-    {
-        "id": "VB-22436",
-        "callsign": "VANDE-BHARAT",
-        "category": "train",
-        "operator": "Indian Railways (NR)",
-        "origin": {"code": "NDLS", "city": "New Delhi", "lat": 28.6424, "lon": 77.2188},
-        "dest": {"code": "BSB", "city": "Varanasi Jn", "lat": 25.3283, "lon": 82.9739},
-        "lat": 26.8467,
-        "lon": 80.9462,
-        "speed": 130,
-        "altitude": 125,
-        "heading": 110,
-        "status": "Approaching Kanpur Yard",
-        "eta": "14:15 UTC",
-        "fuel": 98,
-        "squawk": "VB-01",
-        "transponder": "GPS / RTIS ISRO Satellite",
-        "source": "CRIS / GTFS-Realtime"
-    },
-    {
-        "id": "RAJ-12952",
-        "callsign": "RAJDHANI-EXP",
-        "category": "train",
-        "operator": "Western Railway",
-        "origin": {"code": "MMCT", "city": "Mumbai Central", "lat": 18.9696, "lon": 72.8193},
-        "dest": {"code": "NDLS", "city": "New Delhi", "lat": 28.6424, "lon": 77.2188},
-        "lat": 22.3072,
-        "lon": 73.1812,
-        "speed": 120,
-        "altitude": 90,
-        "heading": 18,
-        "status": "Running On Time",
-        "eta": "08:35 UTC",
-        "fuel": 95,
-        "squawk": "WR-12952",
-        "transponder": "RTIS Telemetry",
-        "source": "IRCTC / GTFS-RT"
-    },
-    # 🚢 Ships
-    {
-        "id": "EVER-GIVEN",
-        "callsign": "H3RC",
-        "category": "ship",
-        "operator": "Evergreen Marine Corp",
-        "origin": {"code": "PKG", "city": "Port Klang", "lat": 2.9999, "lon": 101.3928},
-        "dest": {"code": "ROT", "city": "Rotterdam", "lat": 51.9244, "lon": 4.4777},
-        "lat": 12.8,
-        "lon": 53.2,
-        "speed": 38,
-        "altitude": 0,
-        "heading": 260,
-        "status": "Transit Gulf of Aden",
-        "eta": "4d 12h",
-        "fuel": 80,
-        "squawk": "MMSI 353136000",
-        "transponder": "Class A AIS",
-        "source": "AISHub / MarineTraffic"
-    },
-    {
-        "id": "INS-VIKRANT",
-        "callsign": "R11",
-        "category": "ship",
-        "operator": "Indian Navy (Carrier)",
-        "origin": {"code": "COK", "city": "Kochi Fleet Base", "lat": 9.9312, "lon": 76.2673},
-        "dest": {"code": "GOA", "city": "Goa Naval Ops", "lat": 15.3857, "lon": 73.8370},
-        "lat": 13.5,
-        "lon": 74.1,
-        "speed": 46,
-        "altitude": 0,
-        "heading": 340,
-        "status": "Active Fleet Patrol",
-        "eta": "Routine",
-        "fuel": 91,
-        "squawk": "SECURE-TAC",
-        "transponder": "Military AIS / TACAN",
-        "source": "Naval Maritime Ops"
-    },
-    # 🚌 Buses
-    {
-        "id": "DL-VOLVO-99",
-        "callsign": "HR-68B-1090",
-        "category": "bus",
-        "operator": "Haryana Roadways Volvo",
-        "origin": {"code": "ISBT", "city": "Delhi Kashmiri Gate", "lat": 28.6675, "lon": 77.2330},
-        "dest": {"code": "CDG", "city": "Chandigarh Sec 17", "lat": 30.7333, "lon": 76.7794},
-        "lat": 29.5,
-        "lon": 76.9,
-        "speed": 85,
-        "altitude": 235,
-        "heading": 345,
-        "status": "GT Road Express Corridor",
-        "eta": "18:00 UTC",
-        "fuel": 72,
-        "squawk": "HR-GPS-99",
-        "transponder": "AIS-140 GPS Tracker",
-        "source": "State Transit GTFS-RT"
-    },
-    # 🚗 Cars
-    {
-        "id": "CAB-DEL-VIP1",
-        "callsign": "EV-NEXON-01",
-        "category": "car",
-        "operator": "BluSmart EV Fleet Delhi",
-        "origin": {"code": "IGI-T3", "city": "Indira Gandhi Airport", "lat": 28.5562, "lon": 77.1000},
-        "dest": {"code": "CP", "city": "Connaught Place", "lat": 28.6315, "lon": 77.2167},
-        "lat": 28.59,
-        "lon": 77.16,
-        "speed": 55,
-        "altitude": 215,
-        "heading": 52,
-        "status": "Trip in Progress",
-        "eta": "14 mins",
-        "fuel": 84,
-        "squawk": "EV-FLEET-DEL",
-        "transponder": "OBD-II Telematics",
-        "source": "BluSmart Fleet Telemetry"
-    }
-]
-
-# In-memory fleet state
-vehicles: List[Dict[str, Any]] = [dict(v) for v in INITIAL_FLEET]
+# Master in-memory fleet state
+live_flights: List[Dict[str, Any]] = []
+live_ships: List[Dict[str, Any]] = []
+all_vehicles: List[Dict[str, Any]] = []
 
 # WebSocket Connection Manager
 class ConnectionManager:
@@ -213,10 +43,12 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        logger.info(f"Client connected. Total clients: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+            logger.info(f"Client disconnected. Remaining clients: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
         for connection in list(self.active_connections):
@@ -227,80 +59,145 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Background dead-reckoning simulation task
-async def dead_reckoning_loop():
+# Background Task 1: Periodic Scraper Loop (FlightRadar24 + AIS Ships)
+async def periodic_scraper_loop():
+    global live_flights, live_ships
     while True:
         try:
-            for v in vehicles:
-                speed_factor = (v["speed"] / 3600.0) * 0.012
-                rad = math.radians(v["heading"])
-                v["lat"] += math.cos(rad) * speed_factor
-                v["lon"] += math.sin(rad) * speed_factor
+            logger.info("Executing periodic live scrape for flights and ships...")
+            scraped_f = await scrape_flights(limit=40)
+            if scraped_f:
+                live_flights = scraped_f
+                logger.info(f"Updated live flights: {len(live_flights)}")
 
-                # Micro fluctuations
-                if random.random() > 0.7:
-                    v["heading"] = (v["heading"] + random.randint(-2, 2) + 360) % 360
+            scraped_s = await scrape_ships(limit=25)
+            if scraped_s:
+                live_ships = scraped_s
+                logger.info(f"Updated live ships: {len(live_ships)}")
+
+        except Exception as e:
+            logger.error(f"Error in scraper loop: {e}")
+
+        # Wait 15 seconds before next live scrape cycle to respect external API limits
+        await asyncio.sleep(15.0)
+
+# Background Task 2: High-frequency 1Hz WebSocket Broadcast & Dead-Reckoning
+async def high_frequency_telemetry_loop():
+    global all_vehicles
+    while True:
+        try:
+            # 1. Update dead-reckoning on live flights
+            for f in live_flights:
+                speed_factor = (f["speed"] / 3600.0) * 0.012
+                rad = math.radians(f["heading"])
+                f["lat"] += math.cos(rad) * speed_factor
+                f["lon"] += math.sin(rad) * speed_factor
                 if random.random() > 0.8:
-                    v["speed"] = max(15, v["speed"] + random.randint(-3, 3))
+                    f["heading"] = (f["heading"] + random.randint(-1, 1) + 360) % 360
 
-            # Broadcast to all connected WebSockets
+            # 2. Update dead-reckoning on live ships
+            for s in live_ships:
+                speed_factor = (s["speed"] / 3600.0) * 0.008
+                rad = math.radians(s["heading"])
+                s["lat"] += math.cos(rad) * speed_factor
+                s["lon"] += math.sin(rad) * speed_factor
+
+            # 3. Compute real-time trains & transit
+            trains = calculate_train_positions()
+            transit = calculate_transit_positions()
+
+            # 4. Merge all active transport categories
+            all_vehicles = live_flights + live_ships + trains + transit
+
+            # 5. Broadcast to connected WebSocket clients
             if manager.active_connections:
                 payload = {
                     "type": "telemetry_update",
                     "timestamp": time.time(),
-                    "vehicles": vehicles
+                    "stats": {
+                        "flights": len(live_flights),
+                        "ships": len(live_ships),
+                        "trains": len(trains),
+                        "transit": len(transit),
+                        "total": len(all_vehicles)
+                    },
+                    "vehicles": all_vehicles
                 }
                 await manager.broadcast(payload)
 
         except Exception as e:
-            print("Error in simulation loop:", e)
+            logger.error(f"Error in telemetry broadcast loop: {e}")
 
         await asyncio.sleep(1.0)
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(dead_reckoning_loop())
+    logger.info("Starting STD Track Telemetry Engine...")
+    # Initial immediate scrape
+    asyncio.create_task(periodic_scraper_loop())
+    asyncio.create_task(high_frequency_telemetry_loop())
 
 @app.get("/")
 def health_check():
     return {
         "status": "online",
-        "service": "STD Track Telemetry Engine",
-        "active_vehicles": len(vehicles),
-        "connected_clients": len(manager.active_connections),
-        "supported_modes": ["flight", "train", "ship", "bus", "car"]
+        "service": "STD Track Scraper & Telemetry Engine",
+        "version": "2.0.0",
+        "scraped_sources": {
+            "flights": "FlightRadar24 ADS-B & OpenSky Network",
+            "ships": "Digitraffic Open AIS & Global Sea Lanes",
+            "trains": "Indian Railways (CRIS/RTIS) Corridors & SNCF",
+            "transit": "State Roadways (Volvo, KSRTC) & City EV Fleets"
+        },
+        "stats": {
+            "active_vehicles": len(all_vehicles),
+            "live_flights": len(live_flights),
+            "live_ships": len(live_ships),
+            "connected_clients": len(manager.active_connections)
+        }
     }
 
 @app.get("/api/vehicles")
 def get_vehicles():
-    return {"vehicles": vehicles}
+    """Returns instant snapshot of all currently active vehicles across categories."""
+    return {
+        "count": len(all_vehicles),
+        "vehicles": all_vehicles
+    }
 
-@app.get("/api/opensky/live")
-async def get_opensky_live():
-    """Proxy fetch to OpenSky Network ADS-B API to avoid client-side CORS issues"""
-    try:
-        url = "https://opensky-network.org/api/states/all?lamin=8&lomin=68&lamax=35&lomax=97"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(url)
-            if res.status_code == 200:
-                data = res.json()
-                return {"success": True, "states": data.get("states", [])[:30]}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-    return {"success": False, "error": "Failed to fetch from OpenSky"}
+@app.get("/api/scraped/flights")
+async def get_scraped_flights():
+    """Returns currently scraped live flights from FlightRadar24 / OpenSky."""
+    return {"count": len(live_flights), "flights": live_flights}
+
+@app.get("/api/scraped/ships")
+async def get_scraped_ships():
+    """Returns currently scraped live vessels from AIS."""
+    return {"count": len(live_ships), "ships": live_ships}
+
+@app.post("/api/refresh")
+async def force_refresh():
+    """Triggers an immediate re-scrape of external APIs."""
+    global live_flights, live_ships
+    live_flights = await scrape_flights(limit=40)
+    live_ships = await scrape_ships(limit=25)
+    return {
+        "status": "refreshed",
+        "flights_count": len(live_flights),
+        "ships_count": len(live_ships)
+    }
 
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry(websocket: WebSocket):
     await manager.connect(websocket)
-    # Send initial snapshot immediately upon connection
+    # Send immediate state on handshake
     await websocket.send_json({
         "type": "initial_state",
         "timestamp": time.time(),
-        "vehicles": vehicles
+        "vehicles": all_vehicles
     })
     try:
         while True:
-            # Receive client ping or filter preferences
             msg = await websocket.receive_text()
             if msg == "ping":
                 await websocket.send_text("pong")

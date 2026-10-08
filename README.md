@@ -1,14 +1,23 @@
-# 📡 STD Track — Realtime Telemetry Backend (FastAPI & WebSockets)
+# 📡 STD Track — Realtime Telemetry Backend (FastAPI, Scrapers & WebSockets)
 
-Real-time multi-modal telemetry streaming engine for **STD Track**. Streams dynamic updates for Airplanes ✈️, Trains 🚆, Ships 🚢, Buses 🚌, and Cars 🚗.
+Real-time multi-modal telemetry streaming engine for **STD Track**. Scrapes and streams live updates for:
+- ✈️ **Airplanes:** Live commercial flights scraped from **FlightRadar24 ADS-B** & **OpenSky Network**.
+- 🚢 **Ships:** Real-time maritime vessels from **Digitraffic Open AIS** & strategic sea lanes (Ever Given, Maersk).
+- 🚆 **Trains:** High-precision track progression across **Indian Railways corridors** (Vande Bharat, Rajdhani, Gatimaan).
+- 🚌 **Buses & 🚗 Cars:** Live state transport (Volvo, KSRTC) & urban EV fleet telematics.
 
 ---
 
-## ⚡ Features
-- **WebSocket Gateway:** `/ws/telemetry` pushes updates every 1 second to all connected dashboards.
-- **Dead-Reckoning Engine:** Simulates realistic movement along headings and speeds.
-- **OpenSky ADS-B Proxy:** `/api/opensky/live` retrieves real commercial flights.
-- **Heroku / Render / Railway Ready:** Pre-configured with `Procfile`, `runtime.txt`, and CORS headers.
+## ⚡ Architecture & Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `WS` | `/ws/telemetry` | High-frequency 1Hz JSON stream for live map rendering. |
+| `GET` | `/` | Health check & active scraped source statistics. |
+| `GET` | `/api/vehicles` | Instant JSON snapshot of all active vehicles across categories. |
+| `GET` | `/api/scraped/flights` | Raw scraped commercial flights from FlightRadar24 / OpenSky. |
+| `GET` | `/api/scraped/ships` | Raw AIS merchant vessel positions. |
+| `POST` | `/api/refresh` | Force an immediate re-scrape of external APIs. |
 
 ---
 
@@ -21,8 +30,9 @@ pip install -r requirements.txt
 # 2. Run with uvicorn
 uvicorn main:app --reload --port 8000
 ```
-Open in browser: `http://localhost:8000` (Health check)  
-WebSocket stream: `ws://localhost:8000/ws/telemetry`
+- API Docs: `http://localhost:8000/docs`
+- Health: `http://localhost:8000`
+- WebSocket stream: `ws://localhost:8000/ws/telemetry`
 
 ---
 
@@ -30,8 +40,8 @@ WebSocket stream: `ws://localhost:8000/ws/telemetry`
 
 ### Deploy on Heroku:
 1. Connect your GitHub repository `LuciferRJ29/std-track-backend` in the Heroku Dashboard.
-2. Enable Automatic Deploys from `main`.
-3. Heroku will automatically detect `Procfile` and `requirements.txt`.
+2. Heroku automatically detects `Procfile` (`web: uvicorn main:app --host 0.0.0.0 --port $PORT`) and `requirements.txt`.
+3. Click **Deploy Branch**.
 
 ### Deploy on Render / Railway:
 - **Build Command:** `pip install -r requirements.txt`
