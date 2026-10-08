@@ -3,7 +3,119 @@ import time
 from typing import List, Dict, Any
 
 WORLD_BUS_ROUTES = [
-    # 🇺🇸 US - Greyhound Express (East Coast)
+    # 🇮🇳 INDIA - Haryana Roadways Volvo
+    {
+        "id": "HR-VOLVO-99",
+        "callsign": "HR-68B-1090",
+        "category": "bus",
+        "operator": "Haryana Roadways Super Luxury",
+        "origin": {"code": "DEL-ISBT", "city": "Delhi Kashmiri Gate (India)", "lat": 28.6675, "lon": 77.2330},
+        "dest": {"code": "CHD-17", "city": "Chandigarh Sec 17 (India)", "lat": 30.7333, "lon": 76.7794},
+        "speed": 85,
+        "altitude": 235,
+        "squawk": "HR-GPS-99",
+        "transponder": "AIS-140 GPS Tracker",
+        "source": "State Roadways Telematics"
+    },
+    # 🇮🇳 INDIA - HRTC Himsuta Volvo (Delhi - Manali)
+    {
+        "id": "HRTC-HIMSUTA-04",
+        "callsign": "HP-63A-4040",
+        "category": "bus",
+        "operator": "HRTC Himsuta Luxury",
+        "origin": {"code": "DEL-ISBT", "city": "Delhi Kashmiri Gate (India)", "lat": 28.6675, "lon": 77.2330},
+        "dest": {"code": "MANALI", "city": "Manali Mall Road (India)", "lat": 32.2396, "lon": 77.1887},
+        "speed": 75,
+        "altitude": 1150,
+        "squawk": "HRTC-04",
+        "transponder": "AIS-140 Hill Highway GPS",
+        "source": "HRTC Live Fleet"
+    },
+    # 🇮🇳 INDIA - RSRTC Goldline (Delhi - Jaipur)
+    {
+        "id": "RSRTC-JAIPUR-21",
+        "callsign": "RJ-14-PC-2121",
+        "category": "bus",
+        "operator": "RSRTC Super Goldline AC",
+        "origin": {"code": "DEL-BH", "city": "Delhi Bikaner House (India)", "lat": 28.6083, "lon": 77.2366},
+        "dest": {"code": "JAI-SC", "city": "Jaipur Sindhi Camp (India)", "lat": 26.9196, "lon": 75.7981},
+        "speed": 80,
+        "altitude": 430,
+        "squawk": "RSRTC-21",
+        "transponder": "RSRTC Fleet Tracker",
+        "source": "Rajasthan Roadways RT"
+    },
+    # 🇮🇳 INDIA - UPSRTC Janrath AC (Delhi - Agra - Lucknow)
+    {
+        "id": "UPSRTC-JANRATH-55",
+        "callsign": "UP-32-JN-5555",
+        "category": "bus",
+        "operator": "UPSRTC Janrath AC Express",
+        "origin": {"code": "DEL-AV", "city": "Delhi Anand Vihar ISBT (India)", "lat": 28.6469, "lon": 77.3164},
+        "dest": {"code": "LKO-CB", "city": "Lucknow Charbagh (India)", "lat": 26.8322, "lon": 80.9189},
+        "speed": 90,
+        "altitude": 140,
+        "squawk": "UPSRTC-55",
+        "transponder": "AIS-140 Expressway GPS",
+        "source": "Yamuna Expressway Telematics"
+    },
+    # 🇮🇳 INDIA - MSRTC Shivneri Scania (Mumbai - Pune)
+    {
+        "id": "MSRTC-SHIVNERI-18",
+        "callsign": "MH-14-BT-1818",
+        "category": "bus",
+        "operator": "MSRTC Shivneri Luxury",
+        "origin": {"code": "MUM-DADAR", "city": "Mumbai Dadar (India)", "lat": 19.0178, "lon": 72.8478},
+        "dest": {"code": "PUN-STN", "city": "Pune Railway Station (India)", "lat": 18.5289, "lon": 73.8744},
+        "speed": 82,
+        "altitude": 560,
+        "squawk": "MSRTC-18",
+        "transponder": "Expressway Smart GPS",
+        "source": "MSRTC Live Mitra"
+    },
+    # 🇮🇳 INDIA - KSRTC Airavat Club Class (Bengaluru - Hyderabad)
+    {
+        "id": "KSRTC-AIRAVAT-77",
+        "callsign": "KA-01-F-7777",
+        "category": "bus",
+        "operator": "KSRTC Airavat Multi-Axle",
+        "origin": {"code": "BLR-MAJ", "city": "Bengaluru Majestic (India)", "lat": 12.9774, "lon": 77.5714},
+        "dest": {"code": "HYD-MGBS", "city": "Hyderabad MGBS (India)", "lat": 17.3753, "lon": 78.4744},
+        "speed": 92,
+        "altitude": 540,
+        "squawk": "KSRTC-77",
+        "transponder": "AIS-140 Smart Transit",
+        "source": "KSRTC Mitra Live Feed"
+    },
+    # 🇮🇳 INDIA - KSRTC Ambaari Dream Class (Bengaluru - Chennai)
+    {
+        "id": "KSRTC-AMBAARI-33",
+        "callsign": "KA-57-F-3333",
+        "category": "bus",
+        "operator": "KSRTC Ambaari Sleeper",
+        "origin": {"code": "BLR-SHANTI", "city": "Bengaluru Shantinagar (India)", "lat": 12.9536, "lon": 77.5954},
+        "dest": {"code": "MAA-CMBT", "city": "Chennai CMBT Koyambedu (India)", "lat": 13.0694, "lon": 80.2057},
+        "speed": 88,
+        "altitude": 120,
+        "squawk": "KSRTC-33",
+        "transponder": "Smart Sleeper Telematics",
+        "source": "KSRTC Mitra Live Feed"
+    },
+    # 🇮🇳 INDIA - GSRTC Volvo (Ahmedabad - Surat - Mumbai)
+    {
+        "id": "GSRTC-VOLVO-88",
+        "callsign": "GJ-18-Z-8888",
+        "category": "bus",
+        "operator": "GSRTC Gurjarnagari Volvo",
+        "origin": {"code": "ADI-GM", "city": "Ahmedabad Geeta Mandir (India)", "lat": 23.0130, "lon": 72.5930},
+        "dest": {"code": "MUM-BORIVLI", "city": "Mumbai Borivali (India)", "lat": 19.2288, "lon": 72.8541},
+        "speed": 85,
+        "altitude": 45,
+        "squawk": "GSRTC-88",
+        "transponder": "Gujarat Roadways GPS",
+        "source": "GSRTC Live Transit"
+    },
+    # 🇺🇸 USA - Greyhound Express (New York - Boston)
     {
         "id": "GREYHOUND-NY-BOS",
         "callsign": "GH-1044-USA",
@@ -17,21 +129,21 @@ WORLD_BUS_ROUTES = [
         "transponder": "Omnitracs Fleet Telematics",
         "source": "Greyhound Live Bus Tracker"
     },
-    # 🇺🇸 US - Greyhound Express (West Coast)
+    # 🇺🇸 USA - Greyhound California (LA - San Francisco)
     {
         "id": "GREYHOUND-LA-SF",
         "callsign": "GH-2088-CA",
         "category": "bus",
         "operator": "Greyhound California",
         "origin": {"code": "LAX", "city": "Los Angeles Union (USA)", "lat": 34.0562, "lon": -118.2365},
-        "dest": {"code": "SFO", "city": "San Francisco Transbay", "lat": 37.7897, "lon": -122.3969},
+        "dest": {"code": "SFO", "city": "San Francisco Transbay (USA)", "lat": 37.7897, "lon": -122.3969},
         "speed": 110,
         "altitude": 85,
         "squawk": "GH-US-02",
         "transponder": "ELD GPS Stream",
         "source": "US Interstate Telematics"
     },
-    # 🇪🇺 Europe - FlixBus (Paris -> Brussels -> Amsterdam)
+    # 🇪🇺 EUROPE - FlixBus (Paris - Brussels - Amsterdam)
     {
         "id": "FLIXBUS-PAR-AMS",
         "callsign": "FLIX-EU-101",
@@ -45,21 +157,7 @@ WORLD_BUS_ROUTES = [
         "transponder": "FlixTelematics GPS",
         "source": "FlixBus Real-Time Stream"
     },
-    # 🇪🇺 Europe - FlixBus (Berlin -> Prague)
-    {
-        "id": "FLIXBUS-BER-PRG",
-        "callsign": "FLIX-EU-420",
-        "category": "bus",
-        "operator": "FlixBus Central Europe",
-        "origin": {"code": "BER", "city": "Berlin ZOB (Germany)", "lat": 52.5073, "lon": 13.2798},
-        "dest": {"code": "PRG", "city": "Prague Florenc (Czechia)", "lat": 50.0901, "lon": 14.4402},
-        "speed": 98,
-        "altitude": 240,
-        "squawk": "FLIX-420",
-        "transponder": "European GTFS-RT",
-        "source": "FlixBus Live Fleet"
-    },
-    # 🇬🇧 UK - National Express
+    # 🇬🇧 UK - National Express (London - Manchester)
     {
         "id": "NAT-EXPRESS-LDN-MAN",
         "callsign": "NX-505-UK",
@@ -72,65 +170,67 @@ WORLD_BUS_ROUTES = [
         "squawk": "NX-505",
         "transponder": "UK Coach Telematics",
         "source": "National Express RT"
-    },
-    # 🇯🇵 Japan - Willer Express Night/Day Highway Coach
-    {
-        "id": "WILLER-TYO-KYO",
-        "callsign": "WILLER-JP-77",
-        "category": "bus",
-        "operator": "Willer Express Japan",
-        "origin": {"code": "HND", "city": "Tokyo Shinjuku (Japan)", "lat": 35.6896, "lon": 139.7006},
-        "dest": {"code": "KIX", "city": "Kyoto Station (Japan)", "lat": 34.9858, "lon": 135.7588},
-        "speed": 88,
-        "altitude": 55,
-        "squawk": "WILLER-77",
-        "transponder": "Japan Highway GPS",
-        "source": "Willer Telematics"
-    },
-    # 🇮🇳 India - Haryana Roadways Volvo
-    {
-        "id": "DL-VOLVO-99",
-        "callsign": "HR-68B-1090",
-        "category": "bus",
-        "operator": "Haryana Roadways Volvo",
-        "origin": {"code": "ISBT", "city": "Delhi Kashmiri Gate (India)", "lat": 28.6675, "lon": 77.2330},
-        "dest": {"code": "CDG", "city": "Chandigarh Sec 17 (India)", "lat": 30.7333, "lon": 76.7794},
-        "speed": 85,
-        "altitude": 235,
-        "squawk": "HR-GPS-99",
-        "transponder": "AIS-140 GPS Tracker",
-        "source": "State Transit GTFS-RT"
-    },
-    # 🇮🇳 India - KSRTC Airavat Club Class
-    {
-        "id": "KA-AIRAVAT-44",
-        "callsign": "KA-01-F-4021",
-        "category": "bus",
-        "operator": "KSRTC Airavat Club Class",
-        "origin": {"code": "BLR", "city": "Bengaluru Majestic (India)", "lat": 12.9774, "lon": 77.5714},
-        "dest": {"code": "HYD", "city": "Hyderabad MGBS (India)", "lat": 17.3753, "lon": 78.4744},
-        "speed": 92,
-        "altitude": 540,
-        "squawk": "KSRTC-4021",
-        "transponder": "AIS-140 Smart Transit",
-        "source": "KSRTC Mitra Feed"
     }
 ]
 
 WORLD_CAR_ROUTES = [
+    # 🇮🇳 India - Delhi BluSmart EV Fleet
     {
-        "id": "CAB-DEL-VIP1",
-        "callsign": "EV-NEXON-01",
+        "id": "BLUSMART-DEL-01",
+        "callsign": "DL-1EV-1001",
         "category": "car",
         "operator": "BluSmart EV Fleet Delhi",
-        "origin": {"code": "IGI-T3", "city": "Delhi IGI Airport", "lat": 28.5562, "lon": 77.1000},
-        "dest": {"code": "CP", "city": "Connaught Place", "lat": 28.6315, "lon": 77.2167},
+        "origin": {"code": "IGI-T3", "city": "Delhi IGI Airport T3", "lat": 28.5562, "lon": 77.1000},
+        "dest": {"code": "CP", "city": "Connaught Place Delhi", "lat": 28.6315, "lon": 77.2167},
         "speed": 55,
         "altitude": 215,
-        "squawk": "EV-DEL",
+        "squawk": "BLU-DEL-01",
+        "transponder": "OBD-II EV Telematics",
+        "source": "BluSmart Fleet Telemetry"
+    },
+    # 🇮🇳 India - Delhi NCR Intercity EV
+    {
+        "id": "BLUSMART-NCR-02",
+        "callsign": "HR-26EV-2002",
+        "category": "car",
+        "operator": "BluSmart EV Fleet Gurugram",
+        "origin": {"code": "CYBER-HUB", "city": "Gurugram Cyber Hub", "lat": 28.4950, "lon": 77.0895},
+        "dest": {"code": "NOIDA-62", "city": "Noida Sector 62", "lat": 28.6280, "lon": 77.3649},
+        "speed": 60,
+        "altitude": 220,
+        "squawk": "BLU-NCR-02",
         "transponder": "OBD-II Telematics",
         "source": "BluSmart Fleet Telemetry"
     },
+    # 🇮🇳 India - Mumbai Uber Black
+    {
+        "id": "UBER-MUM-PREM",
+        "callsign": "MH-02-UB-8888",
+        "category": "car",
+        "operator": "Uber Black Mumbai",
+        "origin": {"code": "BKC", "city": "Bandra Kurla Complex", "lat": 19.0657, "lon": 72.8687},
+        "dest": {"code": "BOM-T2", "city": "Mumbai CSIA Airport T2", "lat": 19.0974, "lon": 72.8744},
+        "speed": 45,
+        "altitude": 15,
+        "squawk": "UBR-MUM-88",
+        "transponder": "Driver App Live GPS",
+        "source": "Uber Telematics API"
+    },
+    # 🇮🇳 India - Bengaluru Ola Electric
+    {
+        "id": "OLA-BLR-ELEC",
+        "callsign": "KA-03-OL-9999",
+        "category": "car",
+        "operator": "Ola Electric Bengaluru",
+        "origin": {"code": "ECITY", "city": "Electronic City Phase 1", "lat": 12.8399, "lon": 77.6770},
+        "dest": {"code": "INDIRA", "city": "Indiranagar 100ft Road", "lat": 12.9784, "lon": 77.6408},
+        "speed": 48,
+        "altitude": 910,
+        "squawk": "OLA-BLR-99",
+        "transponder": "Connected Fleet IoT",
+        "source": "Ola Telematics Feed"
+    },
+    # 🇺🇸 USA - NYC Yellow Cab
     {
         "id": "CAB-NYC-YELLOW",
         "callsign": "NYC-MEDALLION-44",
@@ -143,19 +243,6 @@ WORLD_CAR_ROUTES = [
         "squawk": "NYC-TLC-44",
         "transponder": "NYC TLC Smart Meter",
         "source": "TLC Open Telematics"
-    },
-    {
-        "id": "CAB-LON-BLACKCAB",
-        "callsign": "TX4-LONDON-88",
-        "category": "car",
-        "operator": "London Electric Black Cab",
-        "origin": {"code": "LHR", "city": "Heathrow Airport T5", "lat": 51.4700, "lon": -0.4543},
-        "dest": {"code": "WEST", "city": "Westminster London", "lat": 51.4995, "lon": -0.1248},
-        "speed": 40,
-        "altitude": 20,
-        "squawk": "TFL-TX4-88",
-        "transponder": "TfL Connected Vehicle",
-        "source": "TfL Connected Stream"
     }
 ]
 
