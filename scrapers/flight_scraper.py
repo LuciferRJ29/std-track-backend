@@ -24,17 +24,17 @@ AIRLINE_NAMES = {
     "SIA": "Singapore Airlines"
 }
 
-async def scrape_flights(limit: int = 50) -> List[Dict[str, Any]]:
+async def scrape_flights(limit: int = 100) -> List[Dict[str, Any]]:
     """
-    Scrapes real live commercial flights from FlightRadar24 ADS-B feed,
-    falling back to OpenSky Network if needed.
+    Scrapes real live commercial flights from FlightRadar24 ADS-B feed across
+    Eurasia, Middle East, India, and Southeast Asian corridors.
     """
     flights: List[Dict[str, Any]] = []
 
-    # Source 1: FlightRadar24 Live Radar Stream
+    # Source 1: FlightRadar24 Wide Transcontinental Airspace Stream
     try:
-        # Bounding box covers Indian airspace and regional corridors (Lat: 8-36, Lon: 68-96)
-        fr24_url = "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=35,8,68,96"
+        # Wide bounding box: Europe, Middle East, India, SE Asia (Lat: 0-55, Lon: 20-120)
+        fr24_url = "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=55,0,20,120"
         async with httpx.AsyncClient(timeout=8.0, headers=HEADERS) as client:
             res = await client.get(fr24_url)
             if res.status_code == 200:

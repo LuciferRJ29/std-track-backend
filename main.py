@@ -65,12 +65,12 @@ async def periodic_scraper_loop():
     while True:
         try:
             logger.info("Executing periodic live scrape for flights and ships...")
-            scraped_f = await scrape_flights(limit=40)
+            scraped_f = await scrape_flights(limit=90)
             if scraped_f:
                 live_flights = scraped_f
                 logger.info(f"Updated live flights: {len(live_flights)}")
 
-            scraped_s = await scrape_ships(limit=25)
+            scraped_s = await scrape_ships(limit=35)
             if scraped_s:
                 live_ships = scraped_s
                 logger.info(f"Updated live ships: {len(live_ships)}")
