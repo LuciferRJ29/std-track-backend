@@ -18,7 +18,7 @@ logger = logging.getLogger("std_track")
 app = FastAPI(
     title="STD Track Telemetry Engine",
     description="Worldwide Realtime Multi-Modal Telemetry Engine (FlightRadar24 + OpenSky + AIS Ships + Indian Railways + Global Transit)",
-    version="2.5.0"
+    version="2.5.1"
 )
 
 # CORS configuration
@@ -34,6 +34,28 @@ app.add_middleware(
 live_flights: List[Dict[str, Any]] = []
 live_ships: List[Dict[str, Any]] = []
 all_vehicles: List[Dict[str, Any]] = []
+
+def to_compact(v: Dict[str, Any]) -> Dict[str, Any]:
+    orig = v.get("origin", {})
+    dest = v.get("dest", {})
+    return {
+        "id": v["id"],
+        "cat": v.get("category", "flight"),
+        "op": v.get("operator", "Commercial Transport"),
+        "ac": v.get("aircraft", ""),
+        "lat": round(float(v["lat"]), 4),
+        "lon": round(float(v["lon"]), 4),
+        "spd": int(v.get("speed", 0)),
+        "alt": int(v.get("altitude", 0)),
+        "hdg": int(v.get("heading", 0)),
+        "o": orig.get("code", "DEP") if isinstance(orig, dict) else "DEP",
+        "oc": orig.get("city", "Departure") if isinstance(orig, dict) else str(orig),
+        "d": dest.get("code", "ARR") if isinstance(dest, dict) else "ARR",
+        "dc": dest.get("city", "Destination") if isinstance(dest, dict) else str(dest),
+        "st": v.get("status", "Active"),
+        "sq": str(v.get("squawk", "4701")),
+        "src": v.get("source", "Live Telemetry")
+    }
 
 # WebSocket Connection Manager
 class ConnectionManager:
@@ -109,7 +131,7 @@ async def high_frequency_telemetry_loop():
             # 4. Merge all active transport categories
             all_vehicles = live_flights + live_ships + trains + transit
 
-            # 5. Broadcast to connected WebSocket clients
+            # 5. Broadcast compact payload to connected WebSocket clients (keeps frame well under 500KB)
             if manager.active_connections:
                 payload = {
                     "type": "telemetry_update",
@@ -121,7 +143,7 @@ async def high_frequency_telemetry_loop():
                         "transit": len(transit),
                         "total": len(all_vehicles)
                     },
-                    "vehicles": all_vehicles
+                    "vehicles": [to_compact(v) for v in all_vehicles]
                 }
                 await manager.broadcast(payload)
 
@@ -133,7 +155,6 @@ async def high_frequency_telemetry_loop():
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting STD Track Worldwide Telemetry Engine...")
-    # Initial immediate harvest
     async def initial_harvest():
         global live_flights, live_ships, all_vehicles
         try:
@@ -155,7 +176,7 @@ def health_check():
     return {
         "status": "online",
         "service": "STD Track Scraper & Telemetry Engine",
-        "version": "2.5.0",
+        "version": "2.5.1",
         "scraped_sources": {
             "flights": "FlightRadar24 ADS-B (8 Global Zones) & OpenSky Network",
             "ships": "Digitraffic Open AIS & Global Sea Lanes",
@@ -175,7 +196,7 @@ def get_vehicles():
     """Returns instant snapshot of all currently active vehicles across categories."""
     return {
         "count": len(all_vehicles),
-        "vehicles": all_vehicles
+        "vehicles": [to_compact(v) for v in all_vehicles]
     }
 
 @app.get("/api/scraped/flights")
@@ -203,7 +224,7 @@ async def force_refresh():
 @app.websocket("/ws/telemetry")
 async def websocket_telemetry(websocket: WebSocket):
     await manager.connect(websocket)
-    # Send immediate state on handshake
+    # Send immediate state on handshake with compact format (<450KB frame)
     await websocket.send_json({
         "type": "initial_state",
         "timestamp": time.time(),
@@ -212,7 +233,7 @@ async def websocket_telemetry(websocket: WebSocket):
             "ships": len(live_ships),
             "total": len(all_vehicles)
         },
-        "vehicles": all_vehicles
+        "vehicles": [to_compact(v) for v in all_vehicles]
     })
     try:
         while True:
