@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import math
 import random
@@ -18,7 +19,7 @@ logger = logging.getLogger("std_track")
 app = FastAPI(
     title="STD Track Telemetry Engine",
     description="Worldwide Realtime Multi-Modal Telemetry Engine (FlightRadar24 + OpenSky + AIS Ships + Indian Railways + Global Transit)",
-    version="2.5.1"
+    version="2.5.2"
 )
 
 # CORS configuration
@@ -41,20 +42,20 @@ def to_compact(v: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": v["id"],
         "cat": v.get("category", "flight"),
-        "op": v.get("operator", "Commercial Transport"),
-        "ac": v.get("aircraft", ""),
-        "lat": round(float(v["lat"]), 4),
-        "lon": round(float(v["lon"]), 4),
+        "op": (v.get("operator") or "Commercial Transport")[:25],
+        "ac": (v.get("aircraft") or "")[:18],
+        "lat": round(float(v["lat"]), 3),
+        "lon": round(float(v["lon"]), 3),
         "spd": int(v.get("speed", 0)),
         "alt": int(v.get("altitude", 0)),
         "hdg": int(v.get("heading", 0)),
-        "o": orig.get("code", "DEP") if isinstance(orig, dict) else "DEP",
-        "oc": orig.get("city", "Departure") if isinstance(orig, dict) else str(orig),
-        "d": dest.get("code", "ARR") if isinstance(dest, dict) else "ARR",
-        "dc": dest.get("city", "Destination") if isinstance(dest, dict) else str(dest),
-        "st": v.get("status", "Active"),
-        "sq": str(v.get("squawk", "4701")),
-        "src": v.get("source", "Live Telemetry")
+        "o": (orig.get("code", "DEP") if isinstance(orig, dict) else "DEP")[:8],
+        "oc": (orig.get("city", "Departure") if isinstance(orig, dict) else str(orig))[:20],
+        "d": (dest.get("code", "ARR") if isinstance(dest, dict) else "ARR")[:8],
+        "dc": (dest.get("city", "Destination") if isinstance(dest, dict) else str(dest))[:20],
+        "st": (v.get("status", "Active") or "Active")[:22],
+        "sq": str(v.get("squawk", "4701"))[:8],
+        "src": (v.get("source", "Live Telemetry") or "Live Telemetry")[:18]
     }
 
 # WebSocket Connection Manager
@@ -73,9 +74,13 @@ class ConnectionManager:
             logger.info(f"Client disconnected. Active clients: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
+        if not self.active_connections:
+            return
+        # High-performance zero-whitespace single-pass serialization (keeps frame size compact)
+        msg = json.dumps(data, separators=(',', ':'))
         for connection in list(self.active_connections):
             try:
-                await connection.send_json(data)
+                await connection.send_text(msg)
             except Exception:
                 self.disconnect(connection)
 
@@ -87,7 +92,7 @@ async def periodic_scraper_loop():
     while True:
         try:
             logger.info("Executing global multi-zone scrape for flights and ships...")
-            scraped_f = await scrape_flights(limit=2000)
+            scraped_f = await scrape_flights(limit=1800)
             if scraped_f:
                 live_flights = scraped_f
                 logger.info(f"Updated live flights: {len(live_flights)}")
@@ -158,7 +163,7 @@ async def startup_event():
     async def initial_harvest():
         global live_flights, live_ships, all_vehicles
         try:
-            live_flights = await scrape_flights(limit=2000)
+            live_flights = await scrape_flights(limit=1800)
             live_ships = await scrape_ships(limit=250)
             trains = calculate_train_positions()
             transit = calculate_transit_positions()
@@ -187,6 +192,8 @@ def health_check():
             "active_vehicles": len(all_vehicles),
             "live_flights": len(live_flights),
             "live_ships": len(live_ships),
+            "live_trains": len([v for v in all_vehicles if v.get("category") == "train"]),
+            "live_transit": len([v for v in all_vehicles if v.get("category") in ["bus", "car"]]),
             "connected_clients": len(manager.active_connections)
         }
     }
