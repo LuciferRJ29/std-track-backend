@@ -17,8 +17,8 @@ logger = logging.getLogger("std_track")
 
 app = FastAPI(
     title="STD Track Telemetry Engine",
-    description="Real-time multi-modal transport streaming server (FlightRadar24 + OpenSky + AIS Ships + Indian Railways)",
-    version="2.0.0"
+    description="Worldwide Realtime Multi-Modal Telemetry Engine (FlightRadar24 + OpenSky + AIS Ships + Indian Railways + Global Transit)",
+    version="2.5.0"
 )
 
 # CORS configuration
@@ -43,12 +43,12 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(f"Client connected. Total clients: {len(self.active_connections)}")
+        logger.info(f"Client connected. Active clients: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(f"Client disconnected. Remaining clients: {len(self.active_connections)}")
+            logger.info(f"Client disconnected. Active clients: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
         for connection in list(self.active_connections):
@@ -59,18 +59,18 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Background Task 1: Periodic Scraper Loop (FlightRadar24 + AIS Ships)
+# Background Task 1: Periodic Scraper Loop (FlightRadar24 ADS-B + AIS Ships)
 async def periodic_scraper_loop():
     global live_flights, live_ships
     while True:
         try:
-            logger.info("Executing periodic live scrape for flights and ships...")
-            scraped_f = await scrape_flights(limit=220)
+            logger.info("Executing global multi-zone scrape for flights and ships...")
+            scraped_f = await scrape_flights(limit=2000)
             if scraped_f:
                 live_flights = scraped_f
                 logger.info(f"Updated live flights: {len(live_flights)}")
 
-            scraped_s = await scrape_ships(limit=35)
+            scraped_s = await scrape_ships(limit=250)
             if scraped_s:
                 live_ships = scraped_s
                 logger.info(f"Updated live ships: {len(live_ships)}")
@@ -78,27 +78,27 @@ async def periodic_scraper_loop():
         except Exception as e:
             logger.error(f"Error in scraper loop: {e}")
 
-        # Wait 15 seconds before next live scrape cycle to respect external API limits
-        await asyncio.sleep(15.0)
+        # Refresh scrape every 20 seconds
+        await asyncio.sleep(20.0)
 
-# Background Task 2: High-frequency 1Hz WebSocket Broadcast & Dead-Reckoning
+# Background Task 2: Real-time Telemetry Broadcast & Dead-Reckoning Loop
 async def high_frequency_telemetry_loop():
     global all_vehicles
     while True:
         try:
             # 1. Update dead-reckoning on live flights
             for f in live_flights:
-                speed_factor = (f["speed"] / 3600.0) * 0.012
-                rad = math.radians(f["heading"])
+                speed_factor = (f.get("speed", 500) / 3600.0) * 0.02
+                rad = math.radians(f.get("heading", 0))
                 f["lat"] += math.cos(rad) * speed_factor
                 f["lon"] += math.sin(rad) * speed_factor
-                if random.random() > 0.8:
+                if random.random() > 0.85:
                     f["heading"] = (f["heading"] + random.randint(-1, 1) + 360) % 360
 
             # 2. Update dead-reckoning on live ships
             for s in live_ships:
-                speed_factor = (s["speed"] / 3600.0) * 0.008
-                rad = math.radians(s["heading"])
+                speed_factor = (s.get("speed", 25) / 3600.0) * 0.015
+                rad = math.radians(s.get("heading", 0))
                 s["lat"] += math.cos(rad) * speed_factor
                 s["lon"] += math.sin(rad) * speed_factor
 
@@ -128,12 +128,25 @@ async def high_frequency_telemetry_loop():
         except Exception as e:
             logger.error(f"Error in telemetry broadcast loop: {e}")
 
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(2.0)
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Starting STD Track Telemetry Engine...")
-    # Initial immediate scrape
+    logger.info("Starting STD Track Worldwide Telemetry Engine...")
+    # Initial immediate harvest
+    async def initial_harvest():
+        global live_flights, live_ships, all_vehicles
+        try:
+            live_flights = await scrape_flights(limit=2000)
+            live_ships = await scrape_ships(limit=250)
+            trains = calculate_train_positions()
+            transit = calculate_transit_positions()
+            all_vehicles = live_flights + live_ships + trains + transit
+            logger.info(f"Initial harvest complete! Total active fleet: {len(all_vehicles)}")
+        except Exception as e:
+            logger.warning(f"Initial harvest error: {e}")
+
+    asyncio.create_task(initial_harvest())
     asyncio.create_task(periodic_scraper_loop())
     asyncio.create_task(high_frequency_telemetry_loop())
 
@@ -142,12 +155,12 @@ def health_check():
     return {
         "status": "online",
         "service": "STD Track Scraper & Telemetry Engine",
-        "version": "2.0.0",
+        "version": "2.5.0",
         "scraped_sources": {
-            "flights": "FlightRadar24 ADS-B & OpenSky Network",
+            "flights": "FlightRadar24 ADS-B (8 Global Zones) & OpenSky Network",
             "ships": "Digitraffic Open AIS & Global Sea Lanes",
-            "trains": "Indian Railways (CRIS/RTIS) Corridors & SNCF",
-            "transit": "State Roadways (Volvo, KSRTC) & City EV Fleets"
+            "trains": "Indian Railways (CRIS/RTIS) Corridors & World High Speed Rail",
+            "transit": "State Roadways (Volvo, KSRTC) & Intercity Transit"
         },
         "stats": {
             "active_vehicles": len(all_vehicles),
@@ -179,8 +192,8 @@ async def get_scraped_ships():
 async def force_refresh():
     """Triggers an immediate re-scrape of external APIs."""
     global live_flights, live_ships
-    live_flights = await scrape_flights(limit=40)
-    live_ships = await scrape_ships(limit=25)
+    live_flights = await scrape_flights(limit=2000)
+    live_ships = await scrape_ships(limit=250)
     return {
         "status": "refreshed",
         "flights_count": len(live_flights),
@@ -194,6 +207,11 @@ async def websocket_telemetry(websocket: WebSocket):
     await websocket.send_json({
         "type": "initial_state",
         "timestamp": time.time(),
+        "stats": {
+            "flights": len(live_flights),
+            "ships": len(live_ships),
+            "total": len(all_vehicles)
+        },
         "vehicles": all_vehicles
     })
     try:
