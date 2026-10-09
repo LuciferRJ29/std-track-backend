@@ -90,28 +90,30 @@ AIRLINE_NAMES = {
     "KQA": "Kenya Airways"
 }
 
-# 8 Worldwide Quadrants covering all continents and oceans
+# 9 Global Zones ensuring dense coverage across EVERY continent
 ZONES = [
-    # 🇮🇳 Zone 1: Indian Subcontinent (Delhi, Mumbai, Bengaluru, Chennai, Kolkata, Hyderabad, Goa)
-    {"name": "India Airspace", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=36,8,68,97", "limit": 200},
-    # 🇪🇺 Zone 2: Europe (London, Paris, Frankfurt, Amsterdam, Madrid, Rome)
-    {"name": "Europe Airspace", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=65,30,-15,40", "limit": 350},
-    # 🇺🇸 Zone 3: North America (New York, LA, Chicago, Atlanta, Dallas, Toronto)
-    {"name": "North America", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=60,15,-130,-60", "limit": 450},
-    # 🇨🇳 Zone 4: East Asia & Pacific Rim (Tokyo, Beijing, Shanghai, Seoul, Singapore, Bangkok)
-    {"name": "East Asia & Pacific", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=45,1,100,145", "limit": 350},
-    # 🌍 Zone 5: Middle East & Gulf (Dubai, Doha, Abu Dhabi, Riyadh, Istanbul)
-    {"name": "Middle East & Gulf", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=35,15,45,65", "limit": 150},
-    # 🌎 Zone 6: South America (São Paulo, Buenos Aires, Bogota, Lima, Santiago)
+    # 🇮🇳 Zone 1: Indian Subcontinent (Delhi, Mumbai, Bengaluru, Chennai, Kolkata)
+    {"name": "India Airspace", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=36,8,68,97", "limit": 250},
+    # 🇺🇸 Zone 2: US East & Midwest (New York, Atlanta, Chicago, Miami, Boston)
+    {"name": "US East", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=50,22,-95,-65", "limit": 300},
+    # 🇺🇸 Zone 3: US West & Pacific (Los Angeles, San Francisco, Seattle, Denver, Dallas)
+    {"name": "US West", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=50,22,-125,-95", "limit": 300},
+    # 🇪🇺 Zone 4: Europe (London, Paris, Frankfurt, Amsterdam, Madrid, Rome)
+    {"name": "Europe", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=65,30,-15,40", "limit": 350},
+    # 🇨🇳 Zone 5: East Asia & China (Tokyo, Beijing, Shanghai, Seoul, Singapore, Bangkok)
+    {"name": "East Asia", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=45,1,100,145", "limit": 300},
+    # 🌍 Zone 6: Middle East & Gulf (Dubai, Doha, Abu Dhabi, Riyadh, Istanbul)
+    {"name": "Middle East", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=35,15,45,65", "limit": 150},
+    # 🌎 Zone 7: South America (São Paulo, Buenos Aires, Bogota, Lima, Santiago)
     {"name": "South America", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=15,-55,-85,-35", "limit": 150},
-    # 🇦🇺 Zone 7: Oceania & Australia (Sydney, Melbourne, Brisbane, Auckland, Perth)
-    {"name": "Oceania & Australia", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=-10,-48,110,180", "limit": 150},
-    # 🌍 Zone 8: Africa (Cairo, Johannesburg, Nairobi, Lagos, Casablanca)
-    {"name": "Africa Airspace", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=38,-35,-20,55", "limit": 150}
+    # 🇦🇺 Zone 8: Oceania & Australia (Sydney, Melbourne, Brisbane, Auckland, Perth)
+    {"name": "Australia & Oceania", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=-10,-48,110,180", "limit": 150},
+    # 🌍 Zone 9: Africa (Cairo, Johannesburg, Nairobi, Lagos, Casablanca)
+    {"name": "Africa", "url": "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=38,-35,-20,55", "limit": 150}
 ]
 
-# Keep a robust cache so if any zone temporarily fails or throttles, the sky stays full
-cached_flights: List[Dict[str, Any]] = []
+# Persistent zone-by-zone cache ensuring zero empty regions even during network fluctuation
+zone_cache: Dict[str, List[Dict[str, Any]]] = {}
 
 async def fetch_zone(client: httpx.AsyncClient, zone: Dict[str, Any]) -> List[Dict[str, Any]]:
     zone_flights: List[Dict[str, Any]] = []
@@ -165,76 +167,26 @@ async def fetch_zone(client: httpx.AsyncClient, zone: Dict[str, Any]) -> List[Di
         logger.warning(f"Error scraping zone {zone['name']}: {e}")
     return zone_flights
 
-async def scrape_flights(limit: int = 2000) -> List[Dict[str, Any]]:
+async def scrape_flights(limit: int = 2100) -> List[Dict[str, Any]]:
     """
-    Scrapes real live commercial flights from FlightRadar24 ADS-B across all 8 global zones.
-    If throttled, falls back to OpenSky Network global feed.
+    Scrapes real live commercial flights from FlightRadar24 ADS-B across all 9 global zones.
+    Preserves zone-level caching so that every continent always maintains full density.
     """
-    global cached_flights
-    flights: List[Dict[str, Any]] = []
+    global zone_cache
 
-    async with httpx.AsyncClient(timeout=8.0, headers=HEADERS) as client:
+    async with httpx.AsyncClient(timeout=10.0, headers=HEADERS) as client:
         tasks = [fetch_zone(client, zone) for zone in ZONES]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for res in results:
-            if isinstance(res, list):
-                flights.extend(res)
+        for i, res in enumerate(results):
+            zone_name = ZONES[i]["name"]
+            if isinstance(res, list) and len(res) > 0:
+                zone_cache[zone_name] = res
 
-    # If FR24 returned a rich set, update cache
-    if len(flights) >= 200:
-        cached_flights = flights[:limit]
-        logger.info(f"Total live commercial flights scraped across all continents: {len(cached_flights)}")
-        return cached_flights
+    # Combine all zones from cache
+    all_flights: List[Dict[str, Any]] = []
+    for zone_name, flights in zone_cache.items():
+        all_flights.extend(flights)
 
-    # Fallback to OpenSky Network if FR24 returned too few
-    try:
-        logger.info("Attempting OpenSky fallback harvest...")
-        async with httpx.AsyncClient(timeout=9.0, headers=HEADERS) as client:
-            os_res = await client.get("https://opensky-network.org/api/states/all")
-            if os_res.status_code == 200:
-                os_data = os_res.json()
-                states = os_data.get("states", [])
-                for s in states[:800]:
-                    if not s[5] or not s[6]:
-                        continue
-                    icao = s[0]
-                    callsign = (s[1] or f"OS-{icao}").strip()
-                    lon = float(s[5])
-                    lat = float(s[6])
-                    alt_m = s[7] or 10000
-                    alt_ft = int(alt_m * 3.28084)
-                    vel_ms = s[9] or 220
-                    speed_kmh = int(vel_ms * 3.6)
-                    heading = int(s[10]) if s[10] is not None else 0
-
-                    airline_code = callsign[:3] if len(callsign) >= 3 else ""
-                    operator = AIRLINE_NAMES.get(airline_code, f"{s[2]} Transport" if s[2] else "Civil Aircraft")
-
-                    flights.append({
-                        "id": callsign,
-                        "callsign": callsign,
-                        "category": "flight",
-                        "operator": operator,
-                        "aircraft": "Commercial Jet",
-                        "origin": {"code": "DEP", "city": "Departure", "lat": lat - 1.2, "lon": lon - 1.2},
-                        "dest": {"code": "ARR", "city": "Destination", "lat": lat + 1.2, "lon": lon + 1.2},
-                        "lat": lat,
-                        "lon": lon,
-                        "speed": speed_kmh,
-                        "altitude": alt_ft,
-                        "heading": heading,
-                        "status": "Airborne (OpenSky)",
-                        "eta": "En Route",
-                        "fuel": 80,
-                        "squawk": str(s[14] or "1200"),
-                        "transponder": "OpenSky Network Mode-S",
-                        "source": "OpenSky ADS-B"
-                    })
-    except Exception as e:
-        logger.warning(f"OpenSky fallback error: {e}")
-
-    if flights:
-        cached_flights = flights[:limit]
-        return cached_flights
-    return cached_flights
+    logger.info(f"Total live commercial flights active across all continents: {len(all_flights)}")
+    return all_flights[:limit]
