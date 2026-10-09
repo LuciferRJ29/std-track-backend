@@ -97,7 +97,7 @@ async def periodic_scraper_loop():
                 live_flights = scraped_f
                 logger.info(f"Updated live flights: {len(live_flights)}")
 
-            scraped_s = await scrape_ships(limit=250)
+            scraped_s = await scrape_ships(limit=320)
             if scraped_s:
                 live_ships = scraped_s
                 logger.info(f"Updated live ships: {len(live_ships)}")
@@ -164,7 +164,7 @@ async def startup_event():
         global live_flights, live_ships, all_vehicles
         try:
             live_flights = await scrape_flights(limit=1800)
-            live_ships = await scrape_ships(limit=250)
+            live_ships = await scrape_ships(limit=320)
             trains = calculate_train_positions()
             transit = calculate_transit_positions()
             all_vehicles = live_flights + live_ships + trains + transit
